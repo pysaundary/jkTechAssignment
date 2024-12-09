@@ -1,0 +1,28 @@
+{
+    "app_version":"1.0.0",
+    "communication":{
+        "postgres":{
+            "enable":true,
+            "host":"localhost",
+            "port":5432,
+            "user":"postgres",
+            "password":"10101990",
+            "db_name":"myDb"
+        }
+    },
+    "logger":{
+        "enable":true,
+        "max_size":50,
+        "rotation_count":100
+    },
+    "notification":{
+    },
+    "app":{
+        "host":"localhost",
+        "port":"8003",
+        "media_folder":"media",
+        "allowHost":[
+            "localhost"
+        ]
+    }
+}
