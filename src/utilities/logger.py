@@ -86,4 +86,11 @@ class InternalLoggers:
                 stdout_print = True 
             ).getInstance()
 
+            loggers["transformer_logs"] = PyLogger(
+                "transformer_logs",
+                "transformers.log",
+                f"{base_dir}/logs/transformers",
+                stdout_print = True 
+            ).getInstance()
+
         return loggers

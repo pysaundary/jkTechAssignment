@@ -1,9 +1,14 @@
-from fastapi import HTTPException, APIRouter
-from src.models.models import Document
+from fastapi import HTTPException, APIRouter ,FastAPI, File, UploadFile,BackgroundTasks
+from tortoise.contrib.fastapi import HTTPNotFoundError
+import uuid
+import os
+import asyncio
+
+from src.models.models import UserFilesModel
 from src.schemas.schemas import DocumentIngestionRequest, QuestionRequest, AnswerResponse
 from src.utilities.transformer import generate_embedding
-from typing import List
-import torch
+import src.constant as constants
+from src.utilities.transformers.autobot import Bumblebee
 
 llmRouter = APIRouter()
 
@@ -19,6 +24,82 @@ async def ask(data: QuestionRequest):
 async def get_documents():
     return await list_documents()
 
+@llmRouter.post("/upload_files/")
+async def create_upload_files(files: list[UploadFile] = File(...), user_id: str = None ,topic : str = None ):
+    """
+    Uploads one or multiple PDF files and saves them to a specific folder.
+
+    Args:
+        files: A list of uploaded files.
+        user_id: The ID of the user uploading the files.
+
+    Returns:
+        A JSON response indicating success or failure.
+    """
+    api_logger = constants.internalLoggers.get("apis_logs",None)
+    if not user_id:
+        api_logger.error("User ID is required")
+        raise HTTPException(status_code=400, detail="User ID is required")
+    if not topic :
+        api_logger.error("Topic name is required")
+        raise HTTPException(status_code=400, detail="Topic name is required")
+    uploaded_files = []
+    uuid_data = uuid.uuid4()
+    for file in files:
+        if file.filename.endswith(".pdf"):
+            kwarg_values = {
+                "user_id" : user_id,
+                "uuid" : uuid_data,
+                "topic" : topic,
+                "filename" : file.filename
+            } 
+            file_path, file_url, base_dir  = await UserFilesModel.createFilePath(**kwarg_values)
+            try:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                with open(file_path, "wb") as buffer:
+                    buffer.write(file.file.read())
+                file_model = UserFilesModel(
+                    user = user_id,
+                    topic = topic,
+                    file_path = file_path,
+                    file_url = file_url,
+                    folder_name = base_dir,
+                    topic_uuid = uuid_data
+                 )
+                await file_model.save()
+                uploaded_files.append({"filename": file.filename})
+            except Exception as e:
+                api_logger.error(f"Error uploading file: {e}")
+                return {"error": f"Error uploading file due to : {e}"}
+        else:
+            api_logger.error("Only PDF files are allowed")
+            return {"error": "Only PDF files are allowed"}
+    transformerKwagrs = {
+        "folder_path":base_dir,
+        "topic_uuid" : uuid_data,
+        "modelName":constants.singletonObjectDict.get("transformer",{}).get("model_name"),
+        "device":constants.singletonObjectDict.get("transformer",{}).get("device"),
+        "normalizeEmbeddings":constants.singletonObjectDict.get("transformer",{}).get("normalizeEmbeddings"),
+        "chunkSize":constants.singletonObjectDict.get("transformer",{}).get("chunkSize"),
+        "chunkOverlap":constants.singletonObjectDict.get("transformer",{}).get("chunkOverlap")
+    }
+    transformerObject = Bumblebee(**transformerKwagrs)
+    asyncio.create_task(transformerObject.createVector())
+    return {"uploaded_files": uploaded_files}
+
+@llmRouter.get("/get_user_files/")
+async def getUserFiles(user_id : str):
+    api_logger = constants.internalLoggers.get("apis_logs",None)
+    try:
+        userDocs = await UserFilesModel.getUserDocumentList(user_id)
+        return userDocs
+    except Exception as e:
+        api_logger.error(f"Error due to {e}")
+        return {"error": f"Error due to {e}"}
+
+
+
+
 async def ingest_document(data: DocumentIngestionRequest):
     """
     Handles document ingestion by generating embeddings and saving the document to the database.
@@ -29,45 +110,11 @@ async def ingest_document(data: DocumentIngestionRequest):
     )
     return {"message": "Document ingested successfully", "document_id": doc.id}
 
-
-# async def ask_question(data: QuestionRequest):
-#     """
-#     Handles Q&A requests by retrieving the most relevant document and generating an answer.
-#     """
-#     # Retrieve embeddings from selected documents
-#     if data.document_ids:
-#         docs = await Document.filter(id__in=data.document_ids).all()
-#     else:
-#         docs = await Document.all()
-
-#     if not docs:
-#         raise HTTPException(status_code=404, detail="No documents found")
-
-#     # Generate question embedding
-#     question_embedding = generate_embedding(data.question)
-
-#     # Find the most relevant document (cosine similarity)
-#     similarities = [
-#         (doc, torch.cosine_similarity(
-#             torch.tensor(doc.embeddings),
-#             torch.tensor(question_embedding)
-#         ).item())
-#         for doc in docs
-#     ]
-#     most_relevant_doc = max(similarities, key=lambda x: x[1])[0]
-
-#     # Generate answer (mock example; replace with RAG logic)
-#     answer = f"Answer generated from document '{most_relevant_doc.title}'"
-#     return {"answer": answer}
-
 async def ask_question(request: QuestionRequest):
-    # Fetch document by ID
     document = await Document.filter(id=request.document_ids[0]).first()
 
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    # Perform a simple keyword match to find the relevant content (you can improve this)
     question_keywords = request.question.lower().split()
     relevant_content = []
 
@@ -79,7 +126,6 @@ async def ask_question(request: QuestionRequest):
         return AnswerResponse(answer=" ".join(relevant_content))
     else:
         return AnswerResponse(answer="No relevant content found.")
-
 
 async def list_documents():
     """
