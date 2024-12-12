@@ -3,8 +3,9 @@ from tortoise.contrib.fastapi import HTTPNotFoundError
 import uuid
 import os
 import asyncio
+from tortoise.exceptions import DoesNotExist
 
-from src.models.models import UserFilesModel
+from src.models.models import UserFilesModel,UserFileEmbedding
 from src.schemas.schemas import DocumentIngestionRequest, QuestionRequest, AnswerResponse
 from src.utilities.transformer import generate_embedding
 import src.constant as constants
@@ -12,18 +13,6 @@ from src.utilities.transformers.autobot import Bumblebee
 from src.schemas.schemas import QuestionSchema
 
 llmRouter = APIRouter()
-
-@llmRouter.post("/ingest", status_code=201)
-async def ingest(data: DocumentIngestionRequest):
-    return await ingest_document(data)
-
-@llmRouter.post("/ask", response_model=AnswerResponse)
-async def ask(data: QuestionRequest):
-    return await ask_question(data)
-
-@llmRouter.get("/documents")
-async def get_documents():
-    return await list_documents()
 
 @llmRouter.post("/upload_files/")
 async def create_upload_files(files: list[UploadFile] = File(...), user_id: str = None ,topic : str = None ):
@@ -75,17 +64,11 @@ async def create_upload_files(files: list[UploadFile] = File(...), user_id: str 
         else:
             api_logger.error("Only PDF files are allowed")
             return {"error": "Only PDF files are allowed"}
-    transformerKwagrs = {
-        "folder_path":base_dir,
-        "topic_uuid" : uuid_data,
-        "modelName":constants.singletonObjectDict.get("transformer",{}).get("model_name"),
-        "device":constants.singletonObjectDict.get("transformer",{}).get("device"),
-        "normalizeEmbeddings":constants.singletonObjectDict.get("transformer",{}).get("normalizeEmbeddings"),
-        "chunkSize":constants.singletonObjectDict.get("transformer",{}).get("chunkSize"),
-        "chunkOverlap":constants.singletonObjectDict.get("transformer",{}).get("chunkOverlap")
-    }
-    transformerObject = Bumblebee(**transformerKwagrs)
-    asyncio.create_task(transformerObject.createVector())
+    uFE = UserFileEmbedding(
+                    topic_uuid = uuid_data,
+                    folder_name = base_dir
+                )
+    await uFE.save()
     return {"uploaded_files": uploaded_files}
 
 @llmRouter.get("/get_user_files/")
@@ -99,40 +82,35 @@ async def getUserFiles(user_id : str):
         return {"error": f"Error due to {e}"}
 
 @llmRouter.post("/ask-question/")
-async def askQuestions(requestData : QuestionSchema):
-    pass
-
-
-async def ingest_document(data: DocumentIngestionRequest):
-    """
-    Handles document ingestion by generating embeddings and saving the document to the database.
-    """
-    embedding = generate_embedding(data.content)
-    doc = await Document.create(
-        title=data.title, content=data.content, embeddings=embedding
-    )
-    return {"message": "Document ingested successfully", "document_id": doc.id}
-
-async def ask_question(request: QuestionRequest):
-    document = await Document.filter(id=request.document_ids[0]).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    question_keywords = request.question.lower().split()
-    relevant_content = []
-
-    for line in document.content.split("\n"):
-        if any(keyword in line.lower() for keyword in question_keywords):
-            relevant_content.append(line.strip())
-
-    if relevant_content:
-        return AnswerResponse(answer=" ".join(relevant_content))
-    else:
-        return AnswerResponse(answer="No relevant content found.")
-
-async def list_documents():
-    """
-    Lists all documents in the database.
-    """
-    documents = await Document.all()
-    return [{"id": doc.id, "title": doc.title} for doc in documents]
+async def askQuestions(requestData: QuestionSchema):
+    api_logger = constants.internalLoggers.get("apis_logs", None)
+    try:
+        # Fetch embedding metadata
+        data = await UserFileEmbedding.get(topic_uuid=requestData.topicUUID)
+        a = 123
+        # Prepare transformer arguments
+        transformerKwagrs = {
+            "folder_path": data.folder_name,
+            "topic_uuid": data.topic_uuid,
+            "modelName": constants.singletonObjectDict.get("transformer", {}).get("model_name"),
+            "device": constants.singletonObjectDict.get("transformer", {}).get("device"),
+            "normalizeEmbeddings": constants.singletonObjectDict.get("transformer", {}).get("normalizeEmbeddings"),
+            "chunkSize": constants.singletonObjectDict.get("transformer", {}).get("chunkSize"),
+            "chunkOverlap": constants.singletonObjectDict.get("transformer", {}).get("chunkOverlap"),
+        }
+        
+        # Initialize Bumblebee and fetch answer
+        transformer = Bumblebee(**transformerKwagrs)
+        answer = await transformer.createAndCheckAnswer(requestData.question)
+        
+        # Log and return the answer
+        api_logger.info(f"Answer fetched successfully for topic UUID {requestData.topicUUID}")
+        return {"answer": answer}
+    
+    except DoesNotExist:
+        api_logger.error(f"No embeddings found for topic UUID {requestData.topicUUID}")
+        return {"error": f"No embeddings found for topic UUID {requestData.topicUUID}"}
+    
+    except Exception as e:
+        api_logger.error(f"Failed to process request due to: {e}")
+        return {"error": f"An internal error occurred: {e}"}

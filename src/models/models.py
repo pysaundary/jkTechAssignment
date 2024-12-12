@@ -56,12 +56,13 @@ class UserFilesModel(Model):
             "id": self.id,
             "user": self.user,
             "topic": self.topic,
-            "file_path": self.file_path
+            "file_path": self.file_path,
+            "topic_uuid" : self.topic_uuid
         }
 
 class UserFileEmbedding(Model):
-    topic_uuid = fields.UUIDField()
-    embedding = fields.JSONField()
+    topic_uuid = fields.UUIDField(pk=True)
+    folder_name = fields.CharField(max_length=555)
 
     class Meta:
         table = "files_embeddings"
