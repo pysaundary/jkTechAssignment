@@ -9,6 +9,7 @@ from src.schemas.schemas import DocumentIngestionRequest, QuestionRequest, Answe
 from src.utilities.transformer import generate_embedding
 import src.constant as constants
 from src.utilities.transformers.autobot import Bumblebee
+from src.schemas.schemas import QuestionSchema
 
 llmRouter = APIRouter()
 
@@ -97,7 +98,9 @@ async def getUserFiles(user_id : str):
         api_logger.error(f"Error due to {e}")
         return {"error": f"Error due to {e}"}
 
-
+@llmRouter.post("/ask-question/")
+async def askQuestions(requestData : QuestionSchema):
+    pass
 
 
 async def ingest_document(data: DocumentIngestionRequest):

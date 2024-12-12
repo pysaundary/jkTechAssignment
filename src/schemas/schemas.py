@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel 
 from typing import List
 
 
@@ -14,3 +14,7 @@ class QuestionRequest(BaseModel):
 
 class AnswerResponse(BaseModel):
     answer: str
+
+class QuestionSchema(BaseModel):
+    question : str
+    topicUUID : str

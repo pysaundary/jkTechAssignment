@@ -51,7 +51,7 @@ multidict==6.1.0
 mypy-extensions==1.0.0
 nest-asyncio==1.6.0
 networkx==3.4.2
-numpy==2.2.0
+numpy
 orjson==3.10.12
 packaging==24.2
 parso==0.8.4
@@ -71,7 +71,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-multipart==0.0.19
 pytz==2024.2
-pywin32==308
+# pywin32==308
 PyYAML==6.0.2
 pyzmq==26.2.0
 regex==2024.11.6
