@@ -3,6 +3,7 @@ from tortoise import fields
 from pathlib import Path
 from tortoise.queryset import QuerySet
 from typing import List, Dict, Any
+from tortoise.expressions import Q ,F
 
 import src.constant as constants
 
@@ -18,6 +19,7 @@ class UserFilesModel(Model):
     class Meta:
         table = "files"
 
+
     @staticmethod
     async def createFilePath(**kwargs) -> str:
         try:
@@ -31,38 +33,32 @@ class UserFilesModel(Model):
             return str(file_path), str(url) ,str(base_dir)
         except Exception as e:
             raise Exception(f"failed due to {e}")
-        
-    @staticmethod
-    async def getUserDocumentList(user_id : str,limit : int = 10 , order_by : bool = True , offset : int = 1):
-        if order_by:
-            o = "id"
-        else:
-            o ="-id"
-        query: QuerySet = UserFilesModel.filter(user=user_id).order_by(o)
-        total_count = await query.count()
-        documents: List[UserFilesModel] = await query.offset(offset).limit(limit)
-        return {
-            "total_count": total_count,
-            "documents": [doc.to_dict() for doc in documents]
-        }
-    
 
-    # Helper functions 
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Converts the model instance to a dictionary.
-        """
-        return {
-            "id": self.id,
-            "user": self.user,
-            "topic": self.topic,
-            "file_path": self.file_path,
-            "topic_uuid" : self.topic_uuid
+    @staticmethod
+    async def getUserDocumentList(user_id: str, limit: int = 10, order_by: bool = True, offset: int = 1,topicName = None) -> Dict[str, Any]:
+        order = "topic_uuid" if order_by else "-topic_uuid"
+        offset = max(0, offset - 1)
+        # Filter for unique topics first (more efficient for larger datasets)
+        if topicName:
+            unique_topics = await UserFilesModel.filter(user=user_id,topic = topicName).order_by(order).limit(limit).offset(offset).distinct().values("topic", "topic_uuid")
+        else:
+            unique_topics = await UserFilesModel.filter(user=user_id).order_by(order).limit(limit).offset(offset).distinct().values("topic", "topic_uuid")
+        count = len(unique_topics)
+        
+        # return result
+        for topic in unique_topics:
+            topic["embeddings"] = await UserFileEmbedding.filter(topic_uuid=topic["topic_uuid"], isAllow=True).count()
+        result = {
+            "count":count,
+            "result" : unique_topics
         }
+        return result
 
 class UserFileEmbedding(Model):
     topic_uuid = fields.UUIDField(pk=True)
     folder_name = fields.CharField(max_length=555)
-
+    isAllow = fields.BooleanField(default = True)
+    embeddingBinary = fields.BinaryField()
     class Meta:
         table = "files_embeddings"
+

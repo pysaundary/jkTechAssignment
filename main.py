@@ -11,7 +11,7 @@ from src.utilities.osHelper import getOsName,getCurrentDir,joinDirectory
 from src.communication.postgres import TortoiseConnector
 from src.controller.controller import llmRouter
 import src.constant as constants
-
+from src.utilities.transformers.autobot import Bumblebee
 constants.BASE_DIR = getCurrentDir()
 constants.internalLoggers = InternalLoggers.init_loggers(base_dir=constants.BASE_DIR)
 
@@ -46,6 +46,11 @@ def startTasks():
                 logger.info(f"App Started \n \t \t \t \t \t \t App version : {constants.singletonObjectDict['app_version']}")
             # Add models 
             TortoiseConnector.addModelName("src.models.models")
+            Bumblebee.createHuggingFace(
+                modelName = constants.singletonObjectDict["transformer"]["model_name"],
+                device = constants.singletonObjectDict["transformer"]["device"],
+                normalizeEmbeddings = constants.singletonObjectDict["transformer"]["normalize_embeddings"]
+            )
             app = FastAPI(lifespan=lifespan)
             app.include_router(
                 llmRouter,
