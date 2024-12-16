@@ -45,3 +45,44 @@ Configuration Files: If the project doesn't require configuration file edits, st
 Background Process: If your application runs continuously (like a web server), this execution method might be suitable. If your main.py performs a specific task and exits, consider wrapping it in a loop or using a process manager like supervisord within the container for continuous execution.
 Troubleshooting: If you encounter any issues during installation or execution, refer to the project's documentation (if available) or consult online resources for troubleshooting Python applications.
 This README provides a basic guide to get you started with the project. Feel free to explore the project's code and documentation for further details and customization options.
+
+Directory Structure
+
+Root Folder:
+
+config folder: Contains configuration files (e.g., config.json).
+logs folder: Used to store application logs.
+media folder: Used to store PDF files.
+other folder (Optional): Currently contains miscellaneous files like scripts (e.g., .bat and .sh files) related to log removal.
+src folder: Contains all the source code organized into subdirectories.
+main.py: The main script that serves as the starting point for the application.
+
+
+APIS
+
+Swagger link 
+http://localhost:8003/docs#/
+
+
+for upload document : curl -X 'POST' \
+  'http://localhost:8003/llm-api/upload_files/?user_id=psaundary&topic=geeta' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: multipart/form-data' \
+  -F 'files=@bhagavad-gita-in-english-source-file.pdf;type=application/pdf'
+
+for getting list of documents : curl -X 'GET' \
+  'http://localhost:8003/llm-api/get_user_files/?user_id=psaundary&limit=10&order_by=true&offset=0&topicName=geeta' \
+  -H 'accept: application/json'
+
+for ask question : curl -X 'POST' \
+  'http://localhost:8003/llm-api/ask-question/' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "question": "chapter 1 summary",
+  "topicUUID": "6ba3e499-9df7-4917-889d-6d3d73ec9bd6"
+}'
+
+for enable disable document : curl -X 'GET' \
+  'http://localhost:8003/llm-api/enable-and-disable-topic/?topic_uuid=6ba3e499-9df7-4917-889d-6d3d73ec9bd6&isActive=false' \
+  -H 'accept: application/json'
