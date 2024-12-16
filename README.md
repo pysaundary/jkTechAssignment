@@ -2,6 +2,9 @@
  
 This README provides instructions on how to set up and run the project.
 
+for completing this assignment, i follow this tutorial and also take help form CHAT GPT , Stackoverflow posts
+https://medium.com/@jiangan0808/retrieval-augmented-generation-rag-with-open-source-hugging-face-llms-using-langchain-bd618371be9d
+
 Prerequisites:
 
 Python 3.12 (or later): Download and install Python from https://www.python.org/downloads/ if you don't have it already.
@@ -21,6 +24,8 @@ If you downloaded a ZIP archive, extract the contents to your desired location.
 Install Dependencies:
 
 Open a terminal or command prompt and navigate to the extracted project directory.
+Create a python3.12 venv with venv name using : python -m venv venv
+
 Run the following command to install the required Python packages listed in requirements.txt:
 Bash
 
