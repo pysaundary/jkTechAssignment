@@ -13,11 +13,11 @@ Installation:
 
 Download the Project:
 
-You can download the project as a ZIP archive from [source link here (replace with your download link)].
+You can download the project as a ZIP archive from https://github.com/pysaundary/jkTechAssignment.
 Alternatively, you can clone the project using Git if available:
 Bash
 
-git clone https://https://git-scm.com/@[username]/[project_name].git
+git clone https://github.com/pysaundary/jkTechAssignment
 Extract the Project:
 
 If you downloaded a ZIP archive, extract the contents to your desired location.
